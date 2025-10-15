@@ -43,4 +43,9 @@ cutlass_example_add_executable(
   72c_blackwell_mixed_mxfp8_bf16_gemm
   72c_blackwell_mixed_mxfp8_bf16_gemm.cu
   )
+
+cutlass_example_add_executable(
+  72c_blackwell_mixed_mxfp8_bf16_gemm_all_layouts
+  72c_blackwell_mixed_mxfp8_bf16_gemm_all_layouts.cu
+  )
 endif()
