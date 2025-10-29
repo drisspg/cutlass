@@ -155,6 +155,7 @@ class ArtifactManager:
             "--expt-relaxed-constexpr",
             "-Xcudafe --diag_suppress=esa_on_defaulted_function_ignored",
         ]
+        self._additional_compile_options = []
         self.nvcc()
         self.compiled_cache_device = {}
         self.compiled_cache_host = {}
@@ -166,6 +167,68 @@ class ArtifactManager:
     def nvcc(self):
         self.backend = "nvcc"
         self.default_compile_options = self._nvcc_compile_options
+
+    def set_additional_options(self, options):
+        """
+        Set additional compilation options to be used for all subsequent compilations.
+        
+        :param options: list of additional compiler flags
+        :type options: list of str
+        
+        Example:
+            compiler.set_additional_options(["-lineinfo"])
+        """
+        self._additional_compile_options = options if isinstance(options, list) else [options]
+
+    def add_additional_options(self, options):
+        """
+        Add additional compilation options to the existing set of additional options.
+        
+        :param options: list of additional compiler flags to add
+        :type options: list of str or str
+        
+        Example:
+            compiler.add_additional_options("-lineinfo")
+            compiler.add_additional_options(["-lineinfo", "-G"])
+        """
+        if isinstance(options, str):
+            options = [options]
+        self._additional_compile_options.extend(options)
+
+    def enable_debug_info(self):
+        """
+        Enable debug information in compiled kernels for profiling and debugging.
+        
+        For nvcc backend, this adds the -lineinfo flag which enables generation of 
+        line-number information for device code. This is useful for profiling with 
+        tools like Nsight Compute or nvprof.
+        
+        For nvrtc backend, this adds the -lineinfo flag as well.
+        
+        Example:
+            import cutlass
+            cutlass.backend.compiler.enable_debug_info()
+        """
+        if "-lineinfo" not in self._additional_compile_options:
+            self._additional_compile_options.append("-lineinfo")
+
+    def disable_debug_info(self):
+        """
+        Disable debug information in compiled kernels.
+        
+        Removes the -lineinfo flag from additional compilation options.
+        """
+        while "-lineinfo" in self._additional_compile_options:
+            self._additional_compile_options.remove("-lineinfo")
+
+    def get_additional_options(self):
+        """
+        Get the current list of additional compilation options.
+        
+        :return: list of additional compiler flags
+        :rtype: list of str
+        """
+        return self._additional_compile_options.copy()
 
     def insert_operation(self, op_key, cubin, hostfile, op_name, op_attrs):
         connection = sqlite3.connect(CACHE_FILE)
@@ -366,17 +429,21 @@ class ArtifactManager:
         cutlass.initialize_cuda_context()
         arch = device_cc()
 
+        # Combine default options with additional options
+        host_nvcc_options = self._nvcc_compile_options + self._additional_compile_options
         host_compile_options = CompilationOptions(
-            self._nvcc_compile_options, arch, include_paths)
+            host_nvcc_options, arch, include_paths)
+        
         if compile_options is None:
+            device_options = self.default_compile_options + self._additional_compile_options
             compile_options = CompilationOptions(
-                self.default_compile_options, arch, include_paths)
+                device_options, arch, include_paths)
         # save the cubin
         operation_key = []
         operation_list = []
         for operation in operations:
             # step 1: get kernel string as key
-            key = operation.rt_module.emit() + operation.procedural_name() + self.backend
+            key = operation.rt_module.emit() + operation.procedural_name() + self.backend + str(self._additional_compile_options)
             # step 1: check if the operation is in cache
             compiled_kernel = self.compiled_cache_device.get(key)
 
