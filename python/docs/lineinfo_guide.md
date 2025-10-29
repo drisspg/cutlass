@@ -90,6 +90,8 @@ print(f"Current additional options: {options}")
 
 4. **Global Setting**: The additional compilation options are global and affect all subsequent kernel compilations until changed.
 
+5. **Thread Safety**: The compiler options are stored in a singleton `ArtifactManager` instance. In multi-threaded environments, set compilation options before spawning threads that compile kernels to ensure consistent behavior across all threads.
+
 ## Example: Profiling with Nsight Compute
 
 ```python
